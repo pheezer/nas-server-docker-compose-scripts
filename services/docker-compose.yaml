@@ -1,0 +1,193 @@
+version: '2'
+
+services:
+  plex:
+    image: plex
+    container_name: plex
+    networks:
+      - vinnward_public
+    #ports:
+      #- "32400:32400"
+    expose:
+      - 32400
+      - 32469
+      - 5353
+      - 1900
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=plex"
+      - "traefik.frontend.rule=Host:plex.vinnward.net"
+      - "traefik.port=32400"
+      - "traefik.docker.network=vinnward_public"
+    volumes:
+      - /opt/plex/etc/config:/config
+      - /home/plex:/data
+      - /var/tmp/plex:/transcode
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - VERSION=latest
+      - PUID=1000
+      - PGID=1000
+    depends_on:
+      - nzbget
+      - sickrage
+      - couchpotato
+
+  nzbget:
+    image: nzbget
+    container_name: nzbget
+    networks:
+      - vinnward_public
+    ports:
+      - "6789:6789"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=nzbget"
+      - "traefik.frontend.rule=Host:downloader.vinnward.net"
+      - "traefik.port=6789"
+      - "traefik.docker.network=vinnward_public"
+    volumes:
+      - /opt/nzbget:/config
+      - /home/nzbget:/downloads
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - PUID=1000
+      - PGID=1000
+    depends_on:
+      - sickrage
+      - couchpotato
+
+  sickrage:
+    image: sickrage
+    container_name: sickrage
+    networks:
+      - vinnward_public
+    ports:
+      - "8081:8081"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=sickrage"
+      - "traefik.frontend.rule=Host:tv-indexer.vinnward.net"
+      - "traefik.port=8081"
+      - "traefik.docker.network=vinnward_public"
+    volumes:
+      - /opt/sickrage:/config
+      - /home/nzbget:/downloads
+      - /home/plex/tvshows:/tv
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - PUID=1000
+      - PGID=1000
+
+  couchpotato:
+    image: couchpotato
+    container_name: couchpotato
+    networks:
+      - vinnward_public
+    ports:
+      - "5050:5050"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=couchpotato"
+      - "traefik.frontend.rule=Host:movie-indexer.vinnward.net"
+      - "traefik.port=5050"
+      - "traefik.docker.network=vinnward_public"
+    volumes:
+      - /opt/couchpotato:/config
+      - /home/nzbget/:/downloads
+      - /home/plex/movies:/movies
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - PUID=1000
+      - PGID=1000
+
+  plexpy:
+    image: plexpy
+    container_name: plexpy
+    networks:
+      - vinnward_public
+    ports:
+      - "8181:8181"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=plexpy"
+      - "traefik.frontend.rule=Host:stats.plex.vinnward.net"
+      - "traefik.port=8181"
+      - "traefik.docker.network=vinnward_public"
+    volumes:
+      - /opt/plex/logs:/logs:ro
+      - /opt/plexpy:/config
+    environment:
+      - PUID=1000
+      - PGID=1000
+    depends_on:
+      - plex
+
+  ombi:
+    image: ombi
+    container_name: ombi
+    networks:
+      - vinnward_public
+    ports:
+      - "3579:3579"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=ombi"
+      - "traefik.frontend.rule=Host:request.plex.vinnward.net"
+      - "traefik.port=3579"
+      - "traefik.docker.network=vinnward_public"
+    volumes:
+      - /opt/ombi:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - PUID=1000
+      - PGID=1000
+    depends_on:
+      - plex
+      - sickrage
+      - couchpotato
+
+  seafile:
+    image: jenserat/seafile 
+    container_name: seafile
+    networks:
+      - vinnward_public
+    #ports:
+    # - "8000:8080"
+    # - "8082:8082"
+    expose:
+      - 8000
+      - 8082 
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=seafile"
+      - "traefik.port=8000"
+      - "traefik.frontend.rule=Host:seafile.vinnward.net"
+      - "traefik.docker.network=vinnward_public"
+    volumes:
+      - /home/seafile:/opt/seafile
+    environment:
+      - PUID=1000
+      - PGID=1000
+
+#   koken:
+#    image: koken
+#    container_name: koken
+#    networks:
+#      - web
+#    ports:
+#      - "8023:80"
+#    labels:
+#      - "traefik.enable=true"
+#      - "traefik.backend=koken"
+#      - "traefik.port=8023"
+#      - "traefik.frontend.rule=Host:photo.vinnward.net"
+#      - "traefik.docker.network=web"
+#    volumes:
+#      - /home/koken/data/:/usr/share/nginx/www
+#      - /home/koken/mysql/:/var/lib/mysql
+
+networks:
+  vinnward_public:
+    external:
+      name: traefik_network
